@@ -66,3 +66,4 @@ server <- function(input, output) {
       head(10)
   })
 }
+
