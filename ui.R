@@ -1,44 +1,45 @@
-#
-# This is the user-interface definition of a Shiny web application. You can
-# run the application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    https://shiny.posit.co/
-#
+library(shiny)
 
 ui <- fluidPage(
   
-  titlePanel("BIOS 333 Final Project"),
+  titlePanel("BIOS 333 Final Project: Chicago Environment and Health"),
   
   sidebarLayout(
     
     sidebarPanel(
-      h3("Controls"),
-      
-      selectInput(
-        inputId = "continent",
-        label = "Choose a Continent:",
-        choices = c("Africa", "Americas", "Asia", "Europe", "Oceania")
-      )
+      h3("Project Focus"),
+      p("This app explores whether environmental burden is related to health outcomes across Chicago community areas."),
+      p("Mini Project 1 connects to environmental exposure. Mini Project 2 connects to Chicago Health Atlas health outcomes.")
     ),
     
     mainPanel(
-      h3("Plot Output"),
       
-      plotOutput("lifePlot")
+      h3("Environmental Burden vs Health Outcomes"),
+      
+      selectInput(
+        "health_var",
+        "Choose Health Outcome:",
+        choices = c(
+          "Asthma" = "asthma",
+          "Obesity" = "obesity",
+          "Hypertension" = "hypertension",
+          "Diabetes" = "diabetes"
+        )
+      ),
+      
+      plotOutput("healthPlot"),
+      
+      hr(),
+      
+      h3("Environmental Burden vs Trust in Government"),
+      
+      plotOutput("trustPlot"),
+      
+      hr(),
+      
+      h3("Air Quality vs Asthma"),
+      
+      plotOutput("airPlot")
     )
   )
 )
-
-server <- function(input, output) {
-  
-  output$lifePlot <- renderPlot({
-    hist(rnorm(100),
-         main = paste("Example Plot for", input$continent),
-         col = "skyblue",
-         border = "white")
-  })
-}
-
-shinyApp(ui = ui, server = server)
