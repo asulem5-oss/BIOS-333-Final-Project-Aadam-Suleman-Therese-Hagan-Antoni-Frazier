@@ -6,13 +6,11 @@ library(stringr)
 
 server <- function(input, output, session) {
   
-  # Load Health Atlas
   cha <- read_csv("Chi_Health_Atlas_Data(1).csv", show_col_types = FALSE) %>%
     filter(Layer == "Community area") %>%
     rename(
       community = Name,
       trust_gov = `CHABXHK_2023-2024`,
-      env_justice = CHAKNKC_2023,
       air_quality = `CHASBQJ_2023-2024`,
       obesity = `HCSOB_2023-2024`,
       hypertension = `HCSHYT_2023-2024`,
@@ -23,7 +21,6 @@ server <- function(input, output, session) {
       population = Population
     )
   
-  # Load Open Air data
   open_air <- read_csv("open air.csv", show_col_types = FALSE) %>%
     mutate(
       community = str_remove(sensor_name, "\\s+[0-9]+$"),
@@ -33,7 +30,6 @@ server <- function(input, output, session) {
     ) %>%
     filter(!is.na(community))
   
-  # Summarize Open Air by community
   open_air_summary <- open_air %>%
     group_by(community) %>%
     summarize(
@@ -44,11 +40,29 @@ server <- function(input, output, session) {
       .groups = "drop"
     )
   
-  # Combine datasets
-  # Environmental justice is kept in the data table,
-  # but removed from the main plots because the values are mostly/all zero.
   combined_data <- cha %>%
-    inner_join(open_air_summary, by = "community")
+    inner_join(open_air_summary, by = "community") %>%
+    filter(
+      !is.na(mean_pm25),
+      !is.na(mean_no2),
+      !is.na(asthma),
+      !is.na(obesity),
+      !is.na(hypertension),
+      asthma > 0,
+      obesity > 0,
+      hypertension > 0,
+      mean_pm25 > 0,
+      mean_no2 > 0
+    ) %>%
+    mutate(
+      pm25_scaled = scale(mean_pm25)[,1],
+      no2_scaled = scale(mean_no2)[,1],
+      asthma_scaled = scale(asthma)[,1],
+      obesity_scaled = scale(obesity)[,1],
+      hypertension_scaled = scale(hypertension)[,1],
+      pollution_burden = (pm25_scaled + no2_scaled) / 2,
+      chronic_disease_burden = (asthma_scaled + obesity_scaled + hypertension_scaled) / 3
+    )
   
   output$healthPlot <- renderPlot({
     ggplot(combined_data, aes(x = mean_pm25, y = .data[[input$health_var]])) +
@@ -88,21 +102,23 @@ server <- function(input, output, session) {
   })
   
   output$interactivePlot <- renderPlot({
-    ggplot(combined_data, aes(x = .data[[input$x_var]], y = .data[[input$y_var]])) +
-      geom_point(color = "purple", alpha = 0.7, size = 3) +
-      geom_smooth(method = "lm", se = TRUE, color = "orange") +
-      theme_minimal() +
+    ggplot(combined_data, aes(x = pollution_burden, y = chronic_disease_burden)) +
+      geom_point(aes(size = population), color = "red", alpha = 0.7) +
+      geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 1.2) +
+      theme_minimal(base_size = 15) +
       labs(
-        title = paste(input$x_var, "vs", input$y_var),
-        x = input$x_var,
-        y = input$y_var
+        title = "Combined Pollution Burden vs Chronic Disease Burden",
+        subtitle = "PM2.5 + NO2 compared with asthma + obesity + hypertension",
+        x = "Combined Pollution Burden",
+        y = "Combined Chronic Disease Burden",
+        size = "Population"
       )
   })
   
   output$statsText <- renderPrint({
     cor.test(
-      combined_data[[input$x_var]],
-      combined_data[[input$y_var]],
+      combined_data$pollution_burden,
+      combined_data$chronic_disease_burden,
       use = "complete.obs"
     )
   })
@@ -114,14 +130,14 @@ server <- function(input, output, session) {
         mean_pm25,
         mean_no2,
         mean_temperature,
-        air_quality,
-        env_justice,
         asthma,
         obesity,
         hypertension,
         diabetes,
         trust_gov,
-        traffic_risk
+        traffic_risk,
+        pollution_burden,
+        chronic_disease_burden
       ) %>%
       head(10)
   })

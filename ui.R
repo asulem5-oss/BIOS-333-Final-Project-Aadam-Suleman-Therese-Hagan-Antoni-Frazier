@@ -7,7 +7,6 @@ ui <- fluidPage(
   sidebarLayout(
     
     sidebarPanel(
-      
       h3("Interactive Controls"),
       
       selectInput(
@@ -24,29 +23,7 @@ ui <- fluidPage(
       
       hr(),
       
-      selectInput(
-        "x_var",
-        "Choose Environmental Variable:",
-        choices = c(
-          "PM2.5" = "mean_pm25",
-          "NO2" = "mean_no2",
-          "Temperature" = "mean_temperature",
-          "Traffic Risk" = "traffic_risk",
-          "Air Quality Perception" = "air_quality"
-        )
-      ),
-      
-      selectInput(
-        "y_var",
-        "Choose Health / Community Variable:",
-        choices = c(
-          "Asthma" = "asthma",
-          "Obesity" = "obesity",
-          "Hypertension" = "hypertension",
-          "Diabetes" = "diabetes",
-          "Trust in Government" = "trust_gov"
-        )
-      )
+      p("This dashboard connects Open Air Chicago pollution data with Chicago Health Atlas community health outcomes.")
     ),
     
     mainPanel(
@@ -66,7 +43,7 @@ ui <- fluidPage(
       
       hr(),
       
-      h3("Interactive Combined Dashboard"),
+      h3("Combined Pollution Burden vs Chronic Disease Burden"),
       plotOutput("interactivePlot"),
       
       hr(),
