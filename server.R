@@ -67,13 +67,12 @@ server <- function(input, output, session) {
     pairs <- tribble(
       ~xvar, ~yvar, ~label,
       "mean_pm25", "asthma", "PM2.5 vs Asthma",
+      "mean_pm25", "obesity", "PM2.5 vs Obesity",
       "mean_no2", "asthma", "NO2 vs Asthma",
+      "traffic_risk", "hypertension", "Traffic Risk vs Hypertension",
       "traffic_risk", "asthma", "Traffic Risk vs Asthma",
       "mean_pm25", "hypertension", "PM2.5 vs Hypertension",
       "mean_no2", "hypertension", "NO2 vs Hypertension",
-      "traffic_risk", "hypertension", "Traffic Risk vs Hypertension",
-      "mean_pm25", "obesity", "PM2.5 vs Obesity",
-      "mean_no2", "obesity", "NO2 vs Obesity",
       "mean_temperature", "mean_pm25", "Temperature vs PM2.5",
       "mean_temperature", "mean_no2", "Temperature vs NO2",
       "pollution_burden", "chronic_disease_burden", "Pollution Burden vs Chronic Disease Burden"
@@ -101,6 +100,55 @@ server <- function(input, output, session) {
   
   best_pair <- reactive({
     correlation_results() %>% slice(1)
+  })
+  
+  output$healthPlot <- renderPlot({
+    ggplot(combined_data, aes(x = mean_pm25, y = .data[[input$health_var]])) +
+      geom_point(aes(size = population), alpha = 0.7, color = "steelblue") +
+      geom_smooth(method = "lm", se = TRUE, color = "red") +
+      theme_minimal(base_size = 14) +
+      labs(
+        title = "PM2.5 Exposure vs Selected Health Outcome",
+        x = "Average PM2.5",
+        y = input$health_var,
+        size = "Population"
+      )
+  })
+  
+  output$airPlot <- renderPlot({
+    ggplot(combined_data, aes(x = mean_no2, y = asthma)) +
+      geom_point(color = "purple", alpha = 0.7, size = 3) +
+      geom_smooth(method = "lm", se = TRUE, color = "orange") +
+      theme_minimal(base_size = 14) +
+      labs(
+        title = "NO2 Exposure vs Asthma",
+        x = "Average NO2",
+        y = "Asthma Prevalence"
+      )
+  })
+  
+  output$trafficHyperPlot <- renderPlot({
+    ggplot(combined_data, aes(x = traffic_risk, y = hypertension)) +
+      geom_point(color = "firebrick", size = 3, alpha = 0.7) +
+      geom_smooth(method = "lm", se = TRUE, color = "black") +
+      theme_minimal(base_size = 14) +
+      labs(
+        title = "Traffic Risk vs Hypertension",
+        x = "Traffic Risk",
+        y = "Hypertension"
+      )
+  })
+  
+  output$tempPlot <- renderPlot({
+    ggplot(combined_data, aes(x = mean_temperature, y = mean_pm25)) +
+      geom_point(color = "darkorange", size = 3, alpha = 0.7) +
+      geom_smooth(method = "lm", se = TRUE, color = "black") +
+      theme_minimal(base_size = 14) +
+      labs(
+        title = "Temperature vs PM2.5",
+        x = "Average Temperature",
+        y = "Average PM2.5"
+      )
   })
   
   output$bestPlot <- renderPlot({
@@ -158,55 +206,6 @@ server <- function(input, output, session) {
         Relationship = label,
         `r value` = r_value,
         `p value` = p_value
-      )
-  })
-  
-  output$healthPlot <- renderPlot({
-    ggplot(combined_data, aes(x = mean_pm25, y = .data[[input$health_var]])) +
-      geom_point(aes(size = population), alpha = 0.7, color = "steelblue") +
-      geom_smooth(method = "lm", se = TRUE, color = "red") +
-      theme_minimal() +
-      labs(
-        title = "PM2.5 Exposure vs Selected Health Outcome",
-        x = "Average PM2.5",
-        y = input$health_var,
-        size = "Population"
-      )
-  })
-  
-  output$airPlot <- renderPlot({
-    ggplot(combined_data, aes(x = mean_no2, y = asthma)) +
-      geom_point(color = "purple", alpha = 0.7, size = 3) +
-      geom_smooth(method = "lm", se = TRUE, color = "orange") +
-      theme_minimal() +
-      labs(
-        title = "NO2 Exposure vs Asthma",
-        x = "Average NO2",
-        y = "Asthma Prevalence"
-      )
-  })
-  
-  output$trafficHyperPlot <- renderPlot({
-    ggplot(combined_data, aes(x = traffic_risk, y = hypertension)) +
-      geom_point(color = "firebrick", size = 3, alpha = 0.7) +
-      geom_smooth(method = "lm", se = TRUE, color = "black") +
-      theme_minimal() +
-      labs(
-        title = "Traffic Risk vs Hypertension",
-        x = "Traffic Risk",
-        y = "Hypertension"
-      )
-  })
-  
-  output$tempPlot <- renderPlot({
-    ggplot(combined_data, aes(x = mean_temperature, y = mean_pm25)) +
-      geom_point(color = "darkorange", size = 3, alpha = 0.7) +
-      geom_smooth(method = "lm", se = TRUE, color = "black") +
-      theme_minimal() +
-      labs(
-        title = "Temperature vs PM2.5",
-        x = "Average Temperature",
-        y = "Average PM2.5"
       )
   })
   
