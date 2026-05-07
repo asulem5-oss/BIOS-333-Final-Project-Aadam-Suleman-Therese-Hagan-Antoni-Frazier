@@ -23,7 +23,7 @@ server <- function(input, output, session) {
       population = Population
     )
   
-  # Load Open Air
+  # Load Open Air data
   open_air <- read_csv("open air.csv", show_col_types = FALSE) %>%
     mutate(
       community = str_remove(sensor_name, "\\s+[0-9]+$"),
@@ -33,7 +33,7 @@ server <- function(input, output, session) {
     ) %>%
     filter(!is.na(community))
   
-  # Summarize Open Air by community area
+  # Summarize Open Air by community
   open_air_summary <- open_air %>%
     group_by(community) %>%
     summarize(
@@ -45,10 +45,11 @@ server <- function(input, output, session) {
     )
   
   # Combine datasets
+  # Environmental justice is kept in the data table,
+  # but removed from the main plots because the values are mostly/all zero.
   combined_data <- cha %>%
     inner_join(open_air_summary, by = "community")
   
-  # Plot 1: PM2.5 vs selected health outcome
   output$healthPlot <- renderPlot({
     ggplot(combined_data, aes(x = mean_pm25, y = .data[[input$health_var]])) +
       geom_point(aes(size = population), alpha = 0.7, color = "steelblue") +
@@ -56,14 +57,12 @@ server <- function(input, output, session) {
       theme_minimal() +
       labs(
         title = "PM2.5 Exposure vs Selected Health Outcome",
-        subtitle = "Open Air Chicago joined with Chicago Health Atlas by community area",
-        x = "Average PM2.5 Concentration",
+        x = "Average PM2.5",
         y = input$health_var,
         size = "Population"
       )
   })
   
-  # Plot 2: PM2.5 vs trust in government
   output$trustPlot <- renderPlot({
     ggplot(combined_data, aes(x = mean_pm25, y = trust_gov)) +
       geom_point(color = "darkgreen", alpha = 0.7, size = 3) +
@@ -71,13 +70,11 @@ server <- function(input, output, session) {
       theme_minimal() +
       labs(
         title = "PM2.5 Exposure vs Trust in Government",
-        subtitle = "Higher pollution exposure compared with civic trust",
-        x = "Average PM2.5 Concentration",
+        x = "Average PM2.5",
         y = "Trust in Government"
       )
   })
   
-  # Plot 3: NO2 vs asthma
   output$airPlot <- renderPlot({
     ggplot(combined_data, aes(x = mean_no2, y = asthma)) +
       geom_point(color = "purple", alpha = 0.7, size = 3) +
@@ -85,13 +82,31 @@ server <- function(input, output, session) {
       theme_minimal() +
       labs(
         title = "NO2 Exposure vs Asthma",
-        subtitle = "Traffic-related pollution compared with asthma prevalence",
-        x = "Average NO2 Concentration",
+        x = "Average NO2",
         y = "Asthma Prevalence"
       )
   })
   
-  # Table
+  output$interactivePlot <- renderPlot({
+    ggplot(combined_data, aes(x = .data[[input$x_var]], y = .data[[input$y_var]])) +
+      geom_point(color = "purple", alpha = 0.7, size = 3) +
+      geom_smooth(method = "lm", se = TRUE, color = "orange") +
+      theme_minimal() +
+      labs(
+        title = paste(input$x_var, "vs", input$y_var),
+        x = input$x_var,
+        y = input$y_var
+      )
+  })
+  
+  output$statsText <- renderPrint({
+    cor.test(
+      combined_data[[input$x_var]],
+      combined_data[[input$y_var]],
+      use = "complete.obs"
+    )
+  })
+  
   output$dataTable <- renderTable({
     combined_data %>%
       select(
@@ -99,6 +114,8 @@ server <- function(input, output, session) {
         mean_pm25,
         mean_no2,
         mean_temperature,
+        air_quality,
+        env_justice,
         asthma,
         obesity,
         hypertension,
