@@ -2,19 +2,12 @@ library(shiny)
 library(tidyverse)
 library(ggplot2)
 library(readr)
+library(stringr)
 
 server <- function(input, output, session) {
   
-  cha_file <- list.files(
-    pattern = "Chi_Health_Atlas_Data.*\\.csv$",
-    full.names = TRUE
-  )
-  
-  if (length(cha_file) == 0) {
-    stop("Could not find the Chicago Health Atlas CSV file. Make sure it is inside the same project folder as ui.R and server.R.")
-  }
-  
-  cha <- read_csv(cha_file[1], show_col_types = FALSE) %>%
+  # Load Health Atlas
+  cha <- read_csv("Chi_Health_Atlas_Data(1).csv", show_col_types = FALSE) %>%
     filter(Layer == "Community area") %>%
     rename(
       community = Name,
@@ -30,55 +23,88 @@ server <- function(input, output, session) {
       population = Population
     )
   
+  # Load Open Air
+  open_air <- read_csv("open air.csv", show_col_types = FALSE) %>%
+    mutate(
+      community = str_remove(sensor_name, "\\s+[0-9]+$"),
+      pm25 = pm2_5ConcMass24HourMean.value,
+      no2 = no2Conc24HourMean.value,
+      temperature = temperatureAmbient24HourMean.value
+    ) %>%
+    filter(!is.na(community))
+  
+  # Summarize Open Air by community area
+  open_air_summary <- open_air %>%
+    group_by(community) %>%
+    summarize(
+      mean_pm25 = mean(pm25, na.rm = TRUE),
+      mean_no2 = mean(no2, na.rm = TRUE),
+      mean_temperature = mean(temperature, na.rm = TRUE),
+      n_readings = n(),
+      .groups = "drop"
+    )
+  
+  # Combine datasets
+  combined_data <- cha %>%
+    inner_join(open_air_summary, by = "community")
+  
+  # Plot 1: PM2.5 vs selected health outcome
   output$healthPlot <- renderPlot({
-    ggplot(cha, aes(x = env_justice, y = .data[[input$health_var]])) +
+    ggplot(combined_data, aes(x = mean_pm25, y = .data[[input$health_var]])) +
       geom_point(aes(size = population), alpha = 0.7, color = "steelblue") +
       geom_smooth(method = "lm", se = TRUE, color = "red") +
       theme_minimal() +
       labs(
-        title = "Environmental Burden vs Health Outcome",
-        x = "Environmental Justice Count",
+        title = "PM2.5 Exposure vs Selected Health Outcome",
+        subtitle = "Open Air Chicago joined with Chicago Health Atlas by community area",
+        x = "Average PM2.5 Concentration",
         y = input$health_var,
         size = "Population"
       )
   })
   
+  # Plot 2: PM2.5 vs trust in government
   output$trustPlot <- renderPlot({
-    ggplot(cha, aes(x = env_justice, y = trust_gov)) +
+    ggplot(combined_data, aes(x = mean_pm25, y = trust_gov)) +
       geom_point(color = "darkgreen", alpha = 0.7, size = 3) +
       geom_smooth(method = "lm", se = TRUE, color = "black") +
       theme_minimal() +
       labs(
-        title = "Environmental Burden vs Trust in Government",
-        x = "Environmental Justice Count",
+        title = "PM2.5 Exposure vs Trust in Government",
+        subtitle = "Higher pollution exposure compared with civic trust",
+        x = "Average PM2.5 Concentration",
         y = "Trust in Government"
       )
   })
   
+  # Plot 3: NO2 vs asthma
   output$airPlot <- renderPlot({
-    ggplot(cha, aes(x = air_quality, y = asthma)) +
+    ggplot(combined_data, aes(x = mean_no2, y = asthma)) +
       geom_point(color = "purple", alpha = 0.7, size = 3) +
       geom_smooth(method = "lm", se = TRUE, color = "orange") +
       theme_minimal() +
       labs(
-        title = "Air Quality vs Asthma",
-        x = "Air Quality Perception",
+        title = "NO2 Exposure vs Asthma",
+        subtitle = "Traffic-related pollution compared with asthma prevalence",
+        x = "Average NO2 Concentration",
         y = "Asthma Prevalence"
       )
   })
   
+  # Table
   output$dataTable <- renderTable({
-    cha %>%
+    combined_data %>%
       select(
         community,
-        air_quality,
-        env_justice,
-        traffic_risk,
-        trust_gov,
+        mean_pm25,
+        mean_no2,
+        mean_temperature,
         asthma,
         obesity,
         hypertension,
-        diabetes
+        diabetes,
+        trust_gov,
+        traffic_risk
       ) %>%
       head(10)
   })
