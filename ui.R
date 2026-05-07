@@ -1,3 +1,50 @@
+<<<<<<< HEAD
+library(shiny)
+
+ui <- fluidPage(
+  
+  titlePanel("BIOS 333 Final Project: Chicago Environment and Health"),
+  
+  sidebarLayout(
+    
+    sidebarPanel(
+      h3("Project Focus"),
+      p("This app explores whether environmental burden is related to health outcomes across Chicago community areas."),
+      p("Mini Project 1 connects to environmental exposure. Mini Project 2 connects to Chicago Health Atlas health outcomes.")
+    ),
+    
+    mainPanel(
+      
+      h3("Environmental Burden vs Health Outcomes"),
+      
+      selectInput(
+        "health_var",
+        "Choose Health Outcome:",
+        choices = c(
+          "Asthma" = "asthma",
+          "Obesity" = "obesity",
+          "Hypertension" = "hypertension",
+          "Diabetes" = "diabetes"
+        )
+      ),
+      
+      plotOutput("healthPlot"),
+      
+      hr(),
+      
+      h3("Environmental Burden vs Trust in Government"),
+      
+      plotOutput("trustPlot"),
+      
+      hr(),
+      
+      h3("Air Quality vs Asthma"),
+      
+      plotOutput("airPlot")
+    )
+  )
+)
+=======
 #
 # This is the user-interface definition of a Shiny web application. You can
 # run the application by clicking 'Run App' above.
@@ -66,4 +113,8 @@ server <- function(input, output) {
       head(10)
   })
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 417dddbd63d7c8472c07125131c0ffe8e6e31003
+>>>>>>> 0d16e16f6c4c17428f05ac4111f76ce7f095db2a
