@@ -34,7 +34,9 @@ server <- function(input, output, session) {
     group_by(community) %>%
     summarize(
       mean_pm25 = mean(pm25, na.rm = TRUE),
+      median_pm25 = median(pm25, na.rm = TRUE),
       mean_no2 = mean(no2, na.rm = TRUE),
+      median_no2 = median(no2, na.rm = TRUE),
       mean_temperature = mean(temperature, na.rm = TRUE),
       n_readings = n(),
       .groups = "drop"
@@ -43,26 +45,121 @@ server <- function(input, output, session) {
   combined_data <- cha %>%
     inner_join(open_air_summary, by = "community") %>%
     filter(
-      !is.na(mean_pm25),
-      !is.na(mean_no2),
-      !is.na(asthma),
-      !is.na(obesity),
-      !is.na(hypertension),
+      n_readings >= 10,
+      mean_pm25 > 0,
+      mean_no2 > 0,
       asthma > 0,
       obesity > 0,
       hypertension > 0,
-      mean_pm25 > 0,
-      mean_no2 > 0
+      diabetes > 0
     ) %>%
     mutate(
-      pm25_scaled = scale(mean_pm25)[,1],
-      no2_scaled = scale(mean_no2)[,1],
-      asthma_scaled = scale(asthma)[,1],
-      obesity_scaled = scale(obesity)[,1],
-      hypertension_scaled = scale(hypertension)[,1],
-      pollution_burden = (pm25_scaled + no2_scaled) / 2,
-      chronic_disease_burden = (asthma_scaled + obesity_scaled + hypertension_scaled) / 3
+      pollution_burden = as.numeric(scale(mean_pm25)) + as.numeric(scale(mean_no2)),
+      chronic_disease_burden =
+        as.numeric(scale(asthma)) +
+        as.numeric(scale(obesity)) +
+        as.numeric(scale(hypertension)) +
+        as.numeric(scale(diabetes))
     )
+  
+  correlation_results <- reactive({
+    
+    pairs <- tribble(
+      ~xvar, ~yvar, ~label,
+      "mean_pm25", "asthma", "PM2.5 vs Asthma",
+      "mean_no2", "asthma", "NO2 vs Asthma",
+      "traffic_risk", "asthma", "Traffic Risk vs Asthma",
+      "mean_pm25", "hypertension", "PM2.5 vs Hypertension",
+      "mean_no2", "hypertension", "NO2 vs Hypertension",
+      "traffic_risk", "hypertension", "Traffic Risk vs Hypertension",
+      "mean_pm25", "obesity", "PM2.5 vs Obesity",
+      "mean_no2", "obesity", "NO2 vs Obesity",
+      "mean_temperature", "mean_pm25", "Temperature vs PM2.5",
+      "mean_temperature", "mean_no2", "Temperature vs NO2",
+      "pollution_burden", "chronic_disease_burden", "Pollution Burden vs Chronic Disease Burden"
+    )
+    
+    pairs %>%
+      rowwise() %>%
+      mutate(
+        test = list(
+          cor.test(
+            combined_data[[xvar]],
+            combined_data[[yvar]],
+            method = input$cor_method,
+            use = "complete.obs"
+          )
+        ),
+        r_value = unname(test$estimate),
+        p_value = test$p.value,
+        abs_r = abs(r_value)
+      ) %>%
+      ungroup() %>%
+      arrange(p_value, desc(abs_r)) %>%
+      select(label, xvar, yvar, r_value, p_value, abs_r)
+  })
+  
+  best_pair <- reactive({
+    correlation_results() %>% slice(1)
+  })
+  
+  output$bestPlot <- renderPlot({
+    
+    best <- best_pair()
+    
+    ggplot(
+      combined_data,
+      aes(
+        x = .data[[best$xvar]],
+        y = .data[[best$yvar]]
+      )
+    ) +
+      geom_point(aes(size = population), color = "steelblue", alpha = 0.75) +
+      geom_smooth(method = "lm", se = TRUE, color = "red", linewidth = 1.2) +
+      theme_minimal(base_size = 14) +
+      labs(
+        title = paste("Strongest Observed Relationship:", best$label),
+        subtitle = paste0(
+          "r = ", round(best$r_value, 3),
+          " | p = ", signif(best$p_value, 4),
+          " | method = ", input$cor_method
+        ),
+        x = best$xvar,
+        y = best$yvar,
+        size = "Population"
+      )
+  })
+  
+  output$bestStats <- renderPrint({
+    
+    best <- best_pair()
+    
+    cat("Strongest tested relationship:\n")
+    cat(best$label, "\n\n")
+    cat("Correlation method:", input$cor_method, "\n")
+    cat("r value:", round(best$r_value, 4), "\n")
+    cat("p value:", signif(best$p_value, 5), "\n\n")
+    
+    if (best$p_value < 0.05) {
+      cat("Interpretation: This relationship is statistically significant at p < 0.05.\n")
+    } else {
+      cat("Interpretation: This relationship is not statistically significant at p < 0.05.\n")
+      cat("Use this as an exploratory trend, not proof of a significant relationship.\n")
+    }
+  })
+  
+  output$corTable <- renderTable({
+    correlation_results() %>%
+      mutate(
+        r_value = round(r_value, 3),
+        p_value = signif(p_value, 4)
+      ) %>%
+      select(
+        Relationship = label,
+        `r value` = r_value,
+        `p value` = p_value
+      )
+  })
   
   output$healthPlot <- renderPlot({
     ggplot(combined_data, aes(x = mean_pm25, y = .data[[input$health_var]])) +
@@ -74,18 +171,6 @@ server <- function(input, output, session) {
         x = "Average PM2.5",
         y = input$health_var,
         size = "Population"
-      )
-  })
-  
-  output$trustPlot <- renderPlot({
-    ggplot(combined_data, aes(x = mean_pm25, y = trust_gov)) +
-      geom_point(color = "darkgreen", alpha = 0.7, size = 3) +
-      geom_smooth(method = "lm", se = TRUE, color = "black") +
-      theme_minimal() +
-      labs(
-        title = "PM2.5 Exposure vs Trust in Government",
-        x = "Average PM2.5",
-        y = "Trust in Government"
       )
   })
   
@@ -101,26 +186,28 @@ server <- function(input, output, session) {
       )
   })
   
-  output$interactivePlot <- renderPlot({
-    ggplot(combined_data, aes(x = pollution_burden, y = chronic_disease_burden)) +
-      geom_point(aes(size = population), color = "red", alpha = 0.7) +
-      geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 1.2) +
-      theme_minimal(base_size = 15) +
+  output$trafficHyperPlot <- renderPlot({
+    ggplot(combined_data, aes(x = traffic_risk, y = hypertension)) +
+      geom_point(color = "firebrick", size = 3, alpha = 0.7) +
+      geom_smooth(method = "lm", se = TRUE, color = "black") +
+      theme_minimal() +
       labs(
-        title = "Combined Pollution Burden vs Chronic Disease Burden",
-        subtitle = "PM2.5 + NO2 compared with asthma + obesity + hypertension",
-        x = "Combined Pollution Burden",
-        y = "Combined Chronic Disease Burden",
-        size = "Population"
+        title = "Traffic Risk vs Hypertension",
+        x = "Traffic Risk",
+        y = "Hypertension"
       )
   })
   
-  output$statsText <- renderPrint({
-    cor.test(
-      combined_data$pollution_burden,
-      combined_data$chronic_disease_burden,
-      use = "complete.obs"
-    )
+  output$tempPlot <- renderPlot({
+    ggplot(combined_data, aes(x = mean_temperature, y = mean_pm25)) +
+      geom_point(color = "darkorange", size = 3, alpha = 0.7) +
+      geom_smooth(method = "lm", se = TRUE, color = "black") +
+      theme_minimal() +
+      labs(
+        title = "Temperature vs PM2.5",
+        x = "Average Temperature",
+        y = "Average PM2.5"
+      )
   })
   
   output$dataTable <- renderTable({
@@ -134,7 +221,6 @@ server <- function(input, output, session) {
         obesity,
         hypertension,
         diabetes,
-        trust_gov,
         traffic_risk,
         pollution_burden,
         chronic_disease_burden

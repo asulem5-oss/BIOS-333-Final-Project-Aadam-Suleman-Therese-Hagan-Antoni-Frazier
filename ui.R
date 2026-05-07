@@ -7,11 +7,24 @@ ui <- fluidPage(
   sidebarLayout(
     
     sidebarPanel(
-      h3("Interactive Controls"),
+      h3("Controls"),
+      p("This app tests multiple environmental-health relationships and shows the strongest observed correlation."),
+      
+      selectInput(
+        "cor_method",
+        "Choose Correlation Method:",
+        choices = c(
+          "Spearman" = "spearman",
+          "Pearson" = "pearson"
+        ),
+        selected = "spearman"
+      ),
+      
+      hr(),
       
       selectInput(
         "health_var",
-        "Choose Health Outcome:",
+        "Choose Health Outcome for PM2.5 Plot:",
         choices = c(
           "Asthma" = "asthma",
           "Obesity" = "obesity",
@@ -19,22 +32,28 @@ ui <- fluidPage(
           "Diabetes" = "diabetes"
         ),
         selected = "asthma"
-      ),
-      
-      hr(),
-      
-      p("This dashboard connects Open Air Chicago pollution data with Chicago Health Atlas community health outcomes.")
+      )
     ),
     
     mainPanel(
       
-      h3("PM2.5 Exposure vs Selected Health Outcome"),
-      plotOutput("healthPlot"),
+      h3("Strongest Observed Environmental-Health Relationship"),
+      plotOutput("bestPlot"),
       
       hr(),
       
-      h3("PM2.5 Exposure vs Trust in Government"),
-      plotOutput("trustPlot"),
+      h3("Strongest Correlation Test Result"),
+      verbatimTextOutput("bestStats"),
+      
+      hr(),
+      
+      h3("All Tested Correlations"),
+      tableOutput("corTable"),
+      
+      hr(),
+      
+      h3("PM2.5 Exposure vs Selected Health Outcome"),
+      plotOutput("healthPlot"),
       
       hr(),
       
@@ -43,13 +62,13 @@ ui <- fluidPage(
       
       hr(),
       
-      h3("Combined Pollution Burden vs Chronic Disease Burden"),
-      plotOutput("interactivePlot"),
+      h3("Traffic Risk vs Hypertension"),
+      plotOutput("trafficHyperPlot"),
       
       hr(),
       
-      h3("Correlation Summary"),
-      verbatimTextOutput("statsText"),
+      h3("Temperature vs PM2.5"),
+      plotOutput("tempPlot"),
       
       hr(),
       
